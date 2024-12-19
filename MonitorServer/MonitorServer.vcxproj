@@ -133,6 +133,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\LanServer\LanServer.cpp" />
     <ClCompile Include="..\..\LanServer\LanSession.cpp" />
+    <ClCompile Include="..\..\NetServer\NetServer\NetServer\NetServer.cpp" />
+    <ClCompile Include="..\..\NetServer\NetServer\NetServer\NetSession.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\DataStructure\CLinkedList.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\DB\QueryFactory.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\Monitor\HMonitor.cpp" />
@@ -141,10 +143,14 @@
     <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MonitorLanServer.cpp" />
+    <ClCompile Include="MonitorNetServer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\LanServer\LanServer.h" />
     <ClInclude Include="..\..\LanServer\LanSession.h" />
+    <ClInclude Include="..\..\NetServer\NetServer\NetServer\IHandler.h" />
+    <ClInclude Include="..\..\NetServer\NetServer\NetServer\NetServer.h" />
+    <ClInclude Include="..\..\NetServer\NetServer\NetServer\NetSession.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\Assert.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DataStructure\CAddressTranslator.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DataStructure\CLinkedList.h" />
@@ -163,8 +169,14 @@
     <ClInclude Include="..\..\ServerCommon\ServerCommon\Parser\Parser.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.h" />
+    <ClInclude Include="ChatData.h" />
     <ClInclude Include="CommonProtocol.h" />
+    <ClInclude Include="EchoData.h" />
+    <ClInclude Include="LoginData.h" />
+    <ClInclude Include="MonitorData.h" />
     <ClInclude Include="MonitorLanServer.h" />
+    <ClInclude Include="MonitorNetServer.h" />
+    <ClInclude Include="ServerCommonData.h" />
     <ClInclude Include="ServerInfo.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,11 +1,11 @@
 #pragma once
-#include "LanServer.h"
-#include "ServerInfo.h"
-#include "MonitorNetServer.h"
-class MonitorLanServer : public Monitorable, public LanServer
+#include <unordered_map>
+#include "NetServer.h"
+
+class MonitorNetServer : public NetServer
 {
 public:
-	MonitorLanServer();
+	MonitorNetServer();
 	BOOL Start();
 	virtual BOOL OnConnectionRequest() override;
 	virtual void* OnAccept(ULONGLONG id) override;
@@ -13,11 +13,10 @@ public:
 	virtual void OnRecv(ULONGLONG id, Packet* pPacket) override;
 	virtual void OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket) override;
 	virtual void OnPost(void* order) override;
+	void SendToAllClient(BYTE serverNo, BYTE dataType, int dataValue, int timeStamp);
 
-	// Monitorable Override
-	virtual void OnMonitor() override;
-
-	ServerInfo* pSIArr_;
-	MonitorNetServer* pNetServer;
-	LONG loginServerNum_ = 0;
+	SRWLOCK uMapLock;
+	std::unordered_map<ULONGLONG, NetSession*> uMap;
+	void OnRelease_IMPL(ULONGLONG id);
+	LONG monitorClientNum_ = 0;
 };
