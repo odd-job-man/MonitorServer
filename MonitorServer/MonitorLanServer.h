@@ -2,6 +2,7 @@
 #include "LanServer.h"
 #include "ServerInfo.h"
 #include "MonitorNetServer.h"
+#include "MonitorDbThread.h"
 class MonitorLanServer : public Monitorable, public LanServer
 {
 public:
@@ -20,4 +21,6 @@ public:
 	ServerInfo* pSIArr_;
 	MonitorNetServer* pNetServer;
 	LONG loginServerNum_ = 0;
+	MonitorDbThread* pDbThread_;
+	DBRequestTimer* pDbRequestTimer_;
 };

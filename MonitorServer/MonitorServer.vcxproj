@@ -136,12 +136,14 @@
     <ClCompile Include="..\..\NetServer\NetServer\NetServer\NetServer.cpp" />
     <ClCompile Include="..\..\NetServer\NetServer\NetServer\NetSession.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\DataStructure\CLinkedList.cpp" />
+    <ClCompile Include="..\..\ServerCommon\ServerCommon\DB\DBWriteThreadBase.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\DB\QueryFactory.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\Monitor\HMonitor.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\NetWork\RingBuffer.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MonitorDbThread.cpp" />
     <ClCompile Include="MonitorLanServer.cpp" />
     <ClCompile Include="MonitorNetServer.cpp" />
   </ItemGroup>
@@ -158,6 +160,7 @@
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DataStructure\CLockFreeQueue.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DataStructure\CLockFreeStack.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DataStructure\CTlsObjectPool.h" />
+    <ClInclude Include="..\..\ServerCommon\ServerCommon\DB\DBWriteThreadBase.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\DB\QueryFactory.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\Job\MyJob.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\Logger\Logger.h" />
@@ -174,6 +177,7 @@
     <ClInclude Include="EchoData.h" />
     <ClInclude Include="LoginData.h" />
     <ClInclude Include="MonitorData.h" />
+    <ClInclude Include="MonitorDbThread.h" />
     <ClInclude Include="MonitorLanServer.h" />
     <ClInclude Include="MonitorNetServer.h" />
     <ClInclude Include="ServerCommonData.h" />

@@ -8,10 +8,12 @@
 #include "EchoData.h"
 #include "LoginData.h"
 #include "ServerCommonData.h"
-
+#include "QueryFactory.h"
+#include "MonitorDbThread.h"
+#include <Parser.h>
 ChatData g_chatData;
-EchoData g_echoData;
 LoginData g_loginData;
+EchoData g_echoData;
 ServerCommonData g_common;
 
 LONG LoginArr[SERVERNUM::NUM];
@@ -19,6 +21,7 @@ LONG LoginArr[SERVERNUM::NUM];
 #define PROCESS_QUERY_IMPL(Server,elem,dataValue) do{\
 	EnterCriticalSection(&Server.cs);\
 	Server.elem.total_ += dataValue;\
+	++Server.elem.cnt_;\
 	Server.elem.min_ = min(Server.elem.min_,dataValue);\
 	Server.elem.max_ = max(Server.elem.min_,dataValue);\
 	LeaveCriticalSection(&Server.cs);\
@@ -39,7 +42,7 @@ __forceinline void ProcessQueryData(BYTE dataType, int dataValue, int timeStamp)
 	}
 	case dfMONITOR_DATA_TYPE_LOGIN_SERVER_MEM:
 	{
-		PROCESS_QUERY_IMPL(g_loginData, memoryAvailableByte_, dataValue);
+		PROCESS_QUERY_IMPL(g_loginData, memAvailableByte_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_LOGIN_SESSION:
@@ -152,26 +155,32 @@ __forceinline void ProcessQueryData(BYTE dataType, int dataValue, int timeStamp)
 	}
 	case dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL:
 	{
-		PROCESS_QUERY_IMPL(g_chatData, updateTps_, dataValue);
+		PROCESS_QUERY_IMPL(g_chatData, mQAlloced_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL:
 	{
-		PROCESS_QUERY_IMPL(g_chatData, updateTps_, dataValue);
+		PROCESS_QUERY_IMPL(g_common, cpuTime_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY:
 	{
-		PROCESS_QUERY_IMPL(g_common, NonPagedPoolAvaliableBytes, dataValue);
+		PROCESS_QUERY_IMPL(g_common, nonPagedPoolAvaliableBytes_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV:
+	{
+		PROCESS_QUERY_IMPL(g_common, netWorkRecvPerSec_, dataValue);
 		break;
+	}
 	case dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND:
+	{
+		PROCESS_QUERY_IMPL(g_common, netWorkSendPerSec_, dataValue);
 		break;
+	}
 	case dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY:
 	{
-		PROCESS_QUERY_IMPL(g_common, memAvailable, dataValue);
+		PROCESS_QUERY_IMPL(g_common, memAvailable_, dataValue);
 		break;
 	}
 	default:
@@ -180,6 +189,19 @@ __forceinline void ProcessQueryData(BYTE dataType, int dataValue, int timeStamp)
 	}
 }
 
+__forceinline void ServerOnDBWriteReq(SERVERNUM serverType, MonitorLanServer* pServer)
+{
+	Packet* pPacket = MonitorDbThread::ALLOC();
+	(*pPacket) << (WORD)en_MONITOR_DB_JOB::ONOFF << (int)serverType << (int)SERVERSTATE::ON;
+	pServer->pDbThread_->ReqDBWriteJob(pPacket);
+}
+
+__forceinline void ServerOffDBWriteReq(SERVERNUM serverType, MonitorLanServer* pServer)
+{
+	Packet* pPacket = MonitorDbThread::ALLOC();
+	(*pPacket) << (WORD)en_MONITOR_DB_JOB::ONOFF << (int)serverType << (int)SERVERSTATE::OFF;
+	pServer->pDbThread_->ReqDBWriteJob(pPacket);
+}
 
 MonitorLanServer::MonitorLanServer()
 	:LanServer{ L"MonitorLanConfig.txt" }
@@ -197,10 +219,30 @@ BOOL MonitorLanServer::Start()
 
 	ResumeThread(hAcceptThread_);
 
+	char* pStart;
+	// 타임아웃 2초
+	PARSER psr = CreateParser(L"MonitorLanConfig.txt");
+	GetValue(psr, L"MONITOR_DATA_DB_WRITE_REQUEST_INTERVAL", (PVOID*)&pStart, nullptr);
+	DWORD dbWriteReqInterval = (DWORD)_wtoi((LPCWSTR)pStart);
+
+	GetValue(psr, L"DB_WRITE_TIMEOUT", (PVOID*)&pStart, nullptr);
+	DWORD dbWriteTimeOut = (DWORD)_wtoi((LPCWSTR)pStart);
+	ReleaseParser(psr);
+
+
+	// DbTimeOut, Db쓰기스레드
+	pDbThread_ = new MonitorDbThread{ dbWriteTimeOut,hcp_,3 };
+
+	// 5분에 한번씩 DB스레드에 모니터링 데이터 Wrtie요청
+	pDbRequestTimer_ = new DBRequestTimer{ dbWriteReqInterval,hcp_,3,pDbThread_ };
 	pNetServer = new MonitorNetServer;
 	pNetServer->Start();
 
+	Timer::Reigster_UPDATE(pDbThread_);
+	Timer::Reigster_UPDATE(pDbRequestTimer_);
 	Timer::Reigster_UPDATE(pMU);
+	pDbThread_->RegisterTimeOut();
+
 	Timer::Start();
 	return TRUE;
 }
@@ -225,21 +267,27 @@ void MonitorLanServer::OnRelease(ULONGLONG id)
 	{
 		EnterCriticalSection(&g_chatData.cs);
 		g_chatData.onoff_ = false;
+		g_chatData.Init();
 		LeaveCriticalSection(&g_chatData.cs);
+		ServerOffDBWriteReq(SERVERNUM::CHAT, this);
 		break;
 	}
 	case LOGIN:
 	{
 		EnterCriticalSection(&g_loginData.cs);
 		g_loginData.onoff_ = false;
+		g_loginData.Init();
 		LeaveCriticalSection(&g_loginData.cs);
+		ServerOffDBWriteReq(SERVERNUM::LOGIN, this);
 		break;
 	}
 	case GAME:
 	{
 		EnterCriticalSection(&g_echoData.cs);
 		g_echoData.onoff_ = false;
+		g_echoData.Init();
 		LeaveCriticalSection(&g_echoData.cs);
+		ServerOffDBWriteReq(SERVERNUM::GAME, this);
 		break;
 	}
 	default:
@@ -247,8 +295,14 @@ void MonitorLanServer::OnRelease(ULONGLONG id)
 		break;
 	}
 	InterlockedDecrement(LoginArr + pSI->num_);
-	InterlockedDecrement(&loginServerNum_);
+	if (InterlockedDecrement(&loginServerNum_) == 0)
+	{
+		EnterCriticalSection(&g_common.cs);
+		g_common.Init();
+		LeaveCriticalSection(&g_common.cs);
+	}
 }
+
 
 void MonitorLanServer::OnRecv(ULONGLONG id, Packet* pPacket)
 {
@@ -308,6 +362,7 @@ void MonitorLanServer::OnRecv(ULONGLONG id, Packet* pPacket)
 			__debugbreak();
 			break;
 		}
+		ServerOnDBWriteReq((SERVERNUM)serverNo, this);
 		break;
 	}
 	case en_PACKET_SS_MONITOR_DATA_UPDATE:
@@ -320,6 +375,7 @@ void MonitorLanServer::OnRecv(ULONGLONG id, Packet* pPacket)
 		int idx = LanSession::GET_SESSION_INDEX(id);
 		ServerInfo* pSI = pSIArr_ + idx;
 		pNetServer->SendToAllClient(pSI->num_, dataType, dataValue, timeStamp);
+		ProcessQueryData(dataType, dataValue, timeStamp);
 		break;
 	}
 	default:
@@ -375,14 +431,16 @@ void MonitorLanServer::OnMonitor()
 		"NetSession Num : %d\n"
 		"Net Login MonitorClient Num : %d\n"
 		"Lan RecvTPS : %llu\n"
-		"Net SendTPS: %d\n\n",
+		"Net SendTPS: %d\n"
+		"DbWriteThread Pending Count : %d\n\n",
 		ullElapsedDay, ullElapsedHour, ullElapsedMin, ullElapsedSecond,
 		lSessionNum_,
 		loginServerNum_,
 		pNetServer->lSessionNum_,
 		pNetServer->monitorClientNum_,
 		recvTPS,
-		sendTPS
+		sendTPS,
+		pDbThread_->jobQ_.GetSize()
 	);
 }
 

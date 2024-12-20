@@ -164,8 +164,16 @@ enum en_PACKET_CS_MONITOR_TOOL_RES_LOGIN
 
 enum SERVERNUM
 {
-	CHAT,
+	CHAT = 0,
 	LOGIN,
 	GAME,
 	NUM
+};
+
+enum class DBWriteType
+{
+	CHAT = 0,
+	LOGIN,
+	GAME,
+	HARDWARE
 };
