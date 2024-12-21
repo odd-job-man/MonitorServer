@@ -23,7 +23,7 @@ LONG LoginArr[SERVERNUM::NUM];
 	Server.elem.total_ += dataValue;\
 	++Server.elem.cnt_;\
 	Server.elem.min_ = min(Server.elem.min_,dataValue);\
-	Server.elem.max_ = max(Server.elem.min_,dataValue);\
+	Server.elem.max_ = max(Server.elem.max_,dataValue);\
 	LeaveCriticalSection(&Server.cs);\
 }while (0)\
 
@@ -362,6 +362,9 @@ void MonitorLanServer::OnRecv(ULONGLONG id, Packet* pPacket)
 			__debugbreak();
 			break;
 		}
+		SmartPacket sp = PACKET_ALLOC(Lan);
+		(*sp) << (WORD)1;
+		SendPacket(id, sp);
 		ServerOnDBWriteReq((SERVERNUM)serverNo, this);
 		break;
 	}

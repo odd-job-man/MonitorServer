@@ -19,27 +19,27 @@ MonitorDbThread::MonitorDbThread(DWORD timeOutInterval, HANDLE hCompletionPort, 
 
 void MonitorDbThread::ProcessOnoff(Packet* pPacket)
 {
-	tm currTime;
-	__time64_t longTime;
-	_time64(&longTime);
-	_localtime64_s(&currTime, &longTime);
+	tm curTime;
+	__time64_t temp;
+	_time64(&temp);
+	_localtime64_s(&curTime, &temp);
 
-	char tableName[MAX_PATH] = { '\0' };
-	sprintf_s(tableName, "logdb.onoff_%d%d", currTime.tm_year + 1900, currTime.tm_mon + 1);
+	char tableArr[MAX_PATH];
+	sprintf_s(tableArr, MAX_PATH, "logdb.onoff_%d%d", curTime.tm_year + 1900, curTime.tm_mon + 1);
 
 	int serverNum;
 	int onOffState;
 	(*pPacket) >> serverNum >> onOffState;
 	while (1)
 	{
-		QueryFactory::GetInstance()->MAKE_QUERY("INSERT INTO %s (logtime, serverno, onOffState) VALUES (now(), %d, %d)", tableName, serverNum, onOffState);
+		QueryFactory::GetInstance()->MAKE_QUERY("INSERT INTO %s (logtime, serverno, onOffState) VALUES (now(), %d, %d)", tableArr, serverNum, onOffState);
 		int queryRet = QueryFactory::GetInstance()->ExcuteWriteQuery();
 
 		if (queryRet != 0)
 		{
-			if (queryRet == 1146)
+			if (queryRet == 1146) // 테이블 없음(날짜 넘어감)
 			{
-				QueryFactory::GetInstance()->MAKE_QUERY("CREATE TABLE %s like logdb.onoff", tableName);
+				QueryFactory::GetInstance()->MAKE_QUERY("CREATE TABLE %s like logdb.onoff", tableArr);
 				QueryFactory::GetInstance()->ExcuteWriteQuery();
 			}
 			else
@@ -63,7 +63,7 @@ void MakeMonitorQuery(MonitorData* pMD, LPCSTR pTableName, int serverNo, en_PACK
 
 		if (queryRet != 0)
 		{
-			if (queryRet == 1146)
+			if (queryRet == 1146) // 테이블 없음(날짜 넘어감)
 			{
 				QueryFactory::GetInstance()->MAKE_QUERY("CREATE TABLE %s like logdb.monitorlog", pTableName);
 				QueryFactory::GetInstance()->ExcuteWriteQuery();
@@ -104,61 +104,61 @@ void MonitorDbThread::ProcessMonitorWrite()
 	g_common.Init();
 	LeaveCriticalSection(&g_common.cs);
 
-	tm currTime;
-	__time64_t longTime;
-	_time64(&longTime);
-	_localtime64_s(&currTime, &longTime);
+	tm curTime;
+	__time64_t temp;
+	_time64(&temp);
+	_localtime64_s(&curTime, &temp);
 
-	char tableName[MAX_PATH] = { '\0' };
-	sprintf_s(tableName, "logdb.monitorlog_%d%d", currTime.tm_year + 1900, currTime.tm_mon + 1);
+	char tableArr[MAX_PATH];
+	sprintf_s(tableArr, MAX_PATH, "logdb.monitorlog_%d%d", curTime.tm_year + 1900, curTime.tm_mon + 1);
 	
 	int Cnt = 0;
 	if (chatTemp.onoff_)
 	{
-		MakeMonitorQuery(&chatTemp.cpuTime_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SERVER_CPU);
-		MakeMonitorQuery(&chatTemp.memAvailableByte_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SERVER_MEM);
-		MakeMonitorQuery(&chatTemp.sessionCnt_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SESSION);
-		MakeMonitorQuery(&chatTemp.playerCnt_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_PLAYER);
-		MakeMonitorQuery(&chatTemp.updateTps_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_UPDATE_TPS);
-		MakeMonitorQuery(&chatTemp.packetPoolAlloced_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL);
-		MakeMonitorQuery(&chatTemp.mQAlloced_, tableName, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL);
+		MakeMonitorQuery(&chatTemp.cpuTime_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SERVER_CPU);
+		MakeMonitorQuery(&chatTemp.memAvailableByte_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SERVER_MEM);
+		MakeMonitorQuery(&chatTemp.sessionCnt_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_SESSION);
+		MakeMonitorQuery(&chatTemp.playerCnt_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_PLAYER);
+		MakeMonitorQuery(&chatTemp.updateTps_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_UPDATE_TPS);
+		MakeMonitorQuery(&chatTemp.packetPoolAlloced_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL);
+		MakeMonitorQuery(&chatTemp.mQAlloced_, tableArr, (int)DBWriteType::CHAT, dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL);
 		++Cnt;
 	}
 
 	if (loginTemp.onoff_)
 	{
-		MakeMonitorQuery(&loginTemp.cpuTime_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_LOGIN_SERVER_CPU);
-		MakeMonitorQuery(&loginTemp.memAvailableByte_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_LOGIN_SERVER_MEM);
-		MakeMonitorQuery(&loginTemp.sessionCnt_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_LOGIN_SESSION);
-		MakeMonitorQuery(&loginTemp.loginProcessTps_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_LOGIN_AUTH_TPS);
-		MakeMonitorQuery(&loginTemp.packetPoolAlloced_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_LOGIN_PACKET_POOL);
+		MakeMonitorQuery(&loginTemp.cpuTime_, tableArr, (int)DBWriteType::LOGIN, dfMONITOR_DATA_TYPE_LOGIN_SERVER_CPU);
+		MakeMonitorQuery(&loginTemp.memAvailableByte_, tableArr, (int)DBWriteType::LOGIN, dfMONITOR_DATA_TYPE_LOGIN_SERVER_MEM);
+		MakeMonitorQuery(&loginTemp.sessionCnt_, tableArr, (int)DBWriteType::LOGIN, dfMONITOR_DATA_TYPE_LOGIN_SESSION);
+		MakeMonitorQuery(&loginTemp.loginProcessTps_, tableArr, (int)DBWriteType::LOGIN, dfMONITOR_DATA_TYPE_LOGIN_AUTH_TPS);
+		MakeMonitorQuery(&loginTemp.packetPoolAlloced_, tableArr, (int)DBWriteType::LOGIN, dfMONITOR_DATA_TYPE_LOGIN_PACKET_POOL);
 		++Cnt;
 	}
 
 	if (echoTemp.onoff_)
 	{
-		MakeMonitorQuery(&echoTemp.cpuTime_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_CPU);
-		MakeMonitorQuery(&echoTemp.memAvailableByte_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_MEM);
-		MakeMonitorQuery(&echoTemp.sessionCnt_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SESSION);
-		MakeMonitorQuery(&echoTemp.authCnt_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER);
-		MakeMonitorQuery(&echoTemp.gameCnt_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER);
-		MakeMonitorQuery(&echoTemp.acceptTps_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_ACCEPT_TPS);
-		MakeMonitorQuery(&echoTemp.recvTPS_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_RECV_TPS);
-		MakeMonitorQuery(&echoTemp.sendTPS_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_SEND_TPS);
-		MakeMonitorQuery(&echoTemp.authFPS_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS);
-		MakeMonitorQuery(&echoTemp.gameFPS_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS);
-		MakeMonitorQuery(&echoTemp.packetPoolAlloced_, tableName, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_POOL);
+		MakeMonitorQuery(&echoTemp.cpuTime_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_CPU);
+		MakeMonitorQuery(&echoTemp.memAvailableByte_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_MEM);
+		MakeMonitorQuery(&echoTemp.sessionCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SESSION);
+		MakeMonitorQuery(&echoTemp.authCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER);
+		MakeMonitorQuery(&echoTemp.gameCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER);
+		MakeMonitorQuery(&echoTemp.acceptTps_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_ACCEPT_TPS);
+		MakeMonitorQuery(&echoTemp.recvTPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_RECV_TPS);
+		MakeMonitorQuery(&echoTemp.sendTPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_SEND_TPS);
+		MakeMonitorQuery(&echoTemp.authFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS);
+		MakeMonitorQuery(&echoTemp.gameFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS);
+		MakeMonitorQuery(&echoTemp.packetPoolAlloced_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_POOL);
 		++Cnt;
 	}
 
 	if (Cnt == 0)
 		return;
 
-	MakeMonitorQuery(&hardWareTemp.cpuTime_, tableName, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL);
-	MakeMonitorQuery(&hardWareTemp.nonPagedPoolAvaliableBytes_, tableName, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY);
-	MakeMonitorQuery(&hardWareTemp.netWorkRecvPerSec_, tableName, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV);
-	MakeMonitorQuery(&hardWareTemp.netWorkRecvPerSec_, tableName, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND);
-	MakeMonitorQuery(&hardWareTemp.memAvailable_, tableName, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY);
+	MakeMonitorQuery(&hardWareTemp.cpuTime_, tableArr, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL);
+	MakeMonitorQuery(&hardWareTemp.nonPagedPoolAvaliableBytes_, tableArr, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY);
+	MakeMonitorQuery(&hardWareTemp.netWorkRecvPerSec_, tableArr, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV);
+	MakeMonitorQuery(&hardWareTemp.netWorkSendPerSec_, tableArr, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND);
+	MakeMonitorQuery(&hardWareTemp.memAvailable_, tableArr, (int)DBWriteType::HARDWARE, dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY);
 }
 
 void MonitorDbThread::OnWrite(Packet* pPacket)
