@@ -1,5 +1,6 @@
 #pragma once
 #include "MonitorData.h"
+
 struct LoginData 
 {
 	bool onoff_ = false;			// 실행 여부
@@ -33,7 +34,6 @@ struct LoginData
 		new(&memAvailableByte_)MonitorData{};
 		new(&sessionCnt_)MonitorData{};
 		new(&loginProcessTps_)MonitorData{};
-		new(&packetPoolAlloced_)MonitorData{};
 		new(&packetPoolAlloced_)MonitorData{};
 	}
 };

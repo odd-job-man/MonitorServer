@@ -1,6 +1,8 @@
 #pragma once
 #include <new>
 #include "MonitorData.h"
+
+
 struct ChatData
 {
 	bool onoff_ = false;			

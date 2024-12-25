@@ -55,9 +55,18 @@ void MakeMonitorQuery(MonitorData* pMD, LPCSTR pTableName, int serverNo, en_PACK
 {
 	while (1)
 	{
-		QueryFactory::GetInstance()->
-			MAKE_QUERY("INSERT INTO %s (logtime, serverno, type, avg, min, max) VALUES (now(), %d, %d, %d, %d, %d)", pTableName, serverNo, queryType
-				, (int)(pMD->total_ / (float)pMD->cnt_), pMD->min_, pMD->max_);
+		if (pMD->cnt_ == 0)
+		{
+			QueryFactory::GetInstance()->
+				MAKE_QUERY("INSERT INTO %s (logtime, serverno, type, avg, min, max) VALUES (now(), %d, %d, %d, %d, %d)", pTableName, serverNo, queryType
+					,0, 0, 0);
+		}
+		else
+		{
+			QueryFactory::GetInstance()->
+				MAKE_QUERY("INSERT INTO %s (logtime, serverno, type, avg, min, max) VALUES (now(), %d, %d, %d, %d, %d)", pTableName, serverNo, queryType
+					, (int)(pMD->total_ / (float)pMD->cnt_), pMD->min_, pMD->max_);
+		}
 
 		int queryRet = QueryFactory::GetInstance()->ExcuteWriteQuery();
 
@@ -80,8 +89,8 @@ void MakeMonitorQuery(MonitorData* pMD, LPCSTR pTableName, int serverNo, en_PACK
 void MonitorDbThread::ProcessMonitorWrite()
 {
 	ChatData chatTemp;
-	EchoData echoTemp;
 	LoginData loginTemp;
+	EchoData echoTemp;
 	ServerCommonData hardWareTemp;
 
 	EnterCriticalSection(&g_chatData.cs);
@@ -140,13 +149,13 @@ void MonitorDbThread::ProcessMonitorWrite()
 		MakeMonitorQuery(&echoTemp.cpuTime_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_CPU);
 		MakeMonitorQuery(&echoTemp.memAvailableByte_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SERVER_MEM);
 		MakeMonitorQuery(&echoTemp.sessionCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_SESSION);
-		MakeMonitorQuery(&echoTemp.authCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER);
-		MakeMonitorQuery(&echoTemp.gameCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER);
+		MakeMonitorQuery(&echoTemp.authPlayerCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER);
+		MakeMonitorQuery(&echoTemp.gamePlayerCnt_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER);
 		MakeMonitorQuery(&echoTemp.acceptTps_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_ACCEPT_TPS);
 		MakeMonitorQuery(&echoTemp.recvTPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_RECV_TPS);
 		MakeMonitorQuery(&echoTemp.sendTPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_SEND_TPS);
-		MakeMonitorQuery(&echoTemp.authFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS);
-		MakeMonitorQuery(&echoTemp.gameFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS);
+		MakeMonitorQuery(&echoTemp.authThreadFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS);
+		MakeMonitorQuery(&echoTemp.gameThreadFPS_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS);
 		MakeMonitorQuery(&echoTemp.packetPoolAlloced_, tableArr, (int)DBWriteType::GAME, dfMONITOR_DATA_TYPE_GAME_PACKET_POOL);
 		++Cnt;
 	}

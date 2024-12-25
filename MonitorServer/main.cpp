@@ -10,6 +10,6 @@ MonitorLanServer g_MLS;
 int main()
 {
 	g_MLS.Start();
-	Sleep(INFINITE);
+	g_MLS.WaitUntilShutDown();
 	return 0;
 }

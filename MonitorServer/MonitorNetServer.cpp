@@ -5,6 +5,7 @@
 #include "Packet.h"
 #include "NetSession.h"
 #include <Assert.h>
+#include <unordered_set>
 
 
 MonitorNetServer::MonitorNetServer()
@@ -22,7 +23,7 @@ BOOL MonitorNetServer::Start()
     return TRUE;
 }
 
-BOOL MonitorNetServer::OnConnectionRequest()
+BOOL MonitorNetServer::OnConnectionRequest(const SOCKADDR_IN* pSockAddrIn)
 {
     return TRUE;
 }
@@ -36,8 +37,8 @@ void MonitorNetServer::OnRelease(ULONGLONG id)
 {
     PostQueuedCompletionStatus(hcp_, 4, (ULONG_PTR)id, (LPOVERLAPPED)&OnPostOverlapped);
 }
-
 void MonitorNetServer::OnRecv(ULONGLONG id, Packet* pPacket)
+
 {
     WORD type;
     (*pPacket) >> type;
@@ -50,7 +51,7 @@ void MonitorNetServer::OnRecv(ULONGLONG id, Packet* pPacket)
 
         // 모니터링 클라 자료구조에 추가
         AcquireSRWLockExclusive(&uMapLock);
-        uMap.insert(std::make_pair(id, pSession));
+        uMap.insert(id);
         InterlockedIncrement(&monitorClientNum_);
         ReleaseSRWLockExclusive(&uMapLock);
 
@@ -78,16 +79,22 @@ void MonitorNetServer::OnPost(void* order)
     OnRelease_IMPL(id);
 }
 
+void MonitorNetServer::OnLastTaskBeforeAllWorkerThreadEndBeforeShutDown()
+{
+}
+
+void MonitorNetServer::OnResourceCleanAtShutDown()
+{
+}
+
 void MonitorNetServer::SendToAllClient(BYTE serverNo, BYTE dataType, int dataValue, int timeStamp)
 {
     SmartPacket sp = PACKET_ALLOC(Net);
     (*sp) << (WORD)en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE << serverNo << dataType << dataValue << timeStamp;
-    AcquireSRWLockExclusive(&uMapLock);
-    for (auto& pair : uMap)
-    {
-        SendPacket(pair.first, sp);
-    }
-    ReleaseSRWLockExclusive(&uMapLock);
+    AcquireSRWLockShared(&uMapLock);
+    for (ULONGLONG id: uMap)
+        SendPacket(id, sp);
+    ReleaseSRWLockShared(&uMapLock);
 }
 
 

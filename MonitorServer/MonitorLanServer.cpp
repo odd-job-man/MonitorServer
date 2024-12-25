@@ -79,12 +79,12 @@ __forceinline void ProcessQueryData(BYTE dataType, int dataValue, int timeStamp)
 	}
 	case dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER:
 	{
-		PROCESS_QUERY_IMPL(g_echoData, authCnt_, dataValue);
+		PROCESS_QUERY_IMPL(g_echoData, authPlayerCnt_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER:
 	{
-		PROCESS_QUERY_IMPL(g_echoData, gameCnt_, dataValue);
+		PROCESS_QUERY_IMPL(g_echoData, gamePlayerCnt_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_GAME_ACCEPT_TPS:
@@ -108,12 +108,12 @@ __forceinline void ProcessQueryData(BYTE dataType, int dataValue, int timeStamp)
 		break;
 	case dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS:
 	{
-		PROCESS_QUERY_IMPL(g_echoData, authFPS_, dataValue);
+		PROCESS_QUERY_IMPL(g_echoData, authThreadFPS_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS:
 	{
-		PROCESS_QUERY_IMPL(g_echoData, gameFPS_, dataValue);
+		PROCESS_QUERY_IMPL(g_echoData, gameThreadFPS_, dataValue);
 		break;
 	}
 	case dfMONITOR_DATA_TYPE_GAME_PACKET_POOL:
@@ -211,8 +211,8 @@ MonitorLanServer::MonitorLanServer()
 BOOL MonitorLanServer::Start()
 {
 	pSIArr_ = new ServerInfo[maxSession_];
-	MonitoringUpdate* pMU = new MonitoringUpdate{ hcp_,1000,3 };
-	pMU->RegisterMonitor(static_cast<const Monitorable*>(this));
+	pConsoleMonitor_ = new MonitoringUpdate{ hcp_,1000,3 };
+	pConsoleMonitor_->RegisterMonitor(static_cast<const Monitorable*>(this));
 
 	for (DWORD i = 0; i < IOCP_WORKER_THREAD_NUM_; ++i)
 		ResumeThread(hIOCPWorkerThreadArr_[i]);
@@ -240,14 +240,13 @@ BOOL MonitorLanServer::Start()
 
 	Timer::Reigster_UPDATE(pDbThread_);
 	Timer::Reigster_UPDATE(pDbRequestTimer_);
-	Timer::Reigster_UPDATE(pMU);
+	Timer::Reigster_UPDATE(pConsoleMonitor_);
 	pDbThread_->RegisterTimeOut();
-
 	Timer::Start();
 	return TRUE;
 }
 
-BOOL MonitorLanServer::OnConnectionRequest()
+BOOL MonitorLanServer::OnConnectionRequest(const SOCKADDR_IN* pSockAddrIn)
 {
 	return TRUE;
 }
@@ -396,6 +395,20 @@ void MonitorLanServer::OnPost(void* order)
 {
 }
 
+void MonitorLanServer::OnLastTaskBeforeAllWorkerThreadEndBeforeShutDown()
+{
+	pNetServer->ShutDown();
+	PostQueuedCompletionStatus(hcp_, 5, (ULONG_PTR)static_cast<UpdateBase*>(pDbRequestTimer_), (LPOVERLAPPED)Timer::GetUpdateOverlapped());
+}
+
+void MonitorLanServer::OnResourceCleanAtShutDown()
+{
+	delete pConsoleMonitor_;
+	delete pDbRequestTimer_;
+	delete pDbThread_;
+	delete pNetServer;
+}
+
 void MonitorLanServer::OnMonitor()
 {
 	FILETIME ftCreationTime, ftExitTime, ftKernelTime, ftUsertTime;
@@ -426,9 +439,12 @@ void MonitorLanServer::OnMonitor()
 	LONG64 recvTPS = InterlockedExchange64(&recvTPS_, 0);
 	LONG sendTPS = InterlockedExchange(&pNetServer->sendTPS_, 0);
 	
+	static int shutDownFlag = 10;
+	static int sdfCleanFlag = 0; // 1분넘어가면 초기화
 
 	printf(
 		"Elapsed Time : %02lluD-%02lluH-%02lluMin-%02lluSec\n"
+		"Remaining PgDn Key Push To Shut Down : %d\n"
 		"LanSession Num : %d\n"
 		"Lan Login UserServer Num : %d\n"
 		"NetSession Num : %d\n"
@@ -437,6 +453,7 @@ void MonitorLanServer::OnMonitor()
 		"Net SendTPS: %d\n"
 		"DbWriteThread Pending Count : %d\n\n",
 		ullElapsedDay, ullElapsedHour, ullElapsedMin, ullElapsedSecond,
+		shutDownFlag,
 		lSessionNum_,
 		loginServerNum_,
 		pNetServer->lSessionNum_,
@@ -445,5 +462,23 @@ void MonitorLanServer::OnMonitor()
 		sendTPS,
 		pDbThread_->jobQ_.GetSize()
 	);
+
+	++sdfCleanFlag;
+	if (sdfCleanFlag == 60)
+	{
+		shutDownFlag = 10;
+		sdfCleanFlag = 0;
+	}
+
+	if (GetAsyncKeyState(VK_NEXT) & 0x0001)
+	{
+		--shutDownFlag;
+		if (shutDownFlag == 0)
+		{
+			printf("Start ShutDown !\n");
+			RequestShutDown();
+			return;
+		}
+	}
 }
 
