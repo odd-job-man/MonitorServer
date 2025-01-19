@@ -228,10 +228,6 @@ MonitorLanServer::MonitorLanServer(const WCHAR* pIP, const USHORT port, const DW
 	pDbRequestTimer_ = new DBRequestTimer{ DBWriteInterval,hcp_,3,pDbThread_ };
 }
 
-MonitorLanServer::MonitorLanServer()
-	:LanServer{ L"MonitorLanConfig.txt" }
-{
-}
 
 BOOL MonitorLanServer::Start(MonitorNetServer* pNetServer)
 {
@@ -241,26 +237,6 @@ BOOL MonitorLanServer::Start(MonitorNetServer* pNetServer)
 	for (DWORD i = 0; i < IOCP_WORKER_THREAD_NUM_; ++i)
 		ResumeThread(hIOCPWorkerThreadArr_[i]);
 
-	ResumeThread(hAcceptThread_);
-
-	//char* pStart;
-	//// 타임아웃 2초
-	//PARSER psr = CreateParser(L"MonitorLanConfig.txt");
-	//GetValue(psr, L"MONITOR_DATA_DB_WRITE_REQUEST_INTERVAL", (PVOID*)&pStart, nullptr);
-	//DWORD dbWriteReqInterval = (DWORD)_wtoi((LPCWSTR)pStart);
-
-	//GetValue(psr, L"DB_WRITE_TIMEOUT", (PVOID*)&pStart, nullptr);
-	//DWORD dbWriteTimeOut = (DWORD)_wtoi((LPCWSTR)pStart);
-	//ReleaseParser(psr);
-
-	//// DbTimeOut, Db쓰기스레드
-	//pDbThread_ = new MonitorDbThread{ dbWriteTimeOut,hcp_,3 };
-
-	//// 5분에 한번씩 DB스레드에 모니터링 데이터 Wrtie요청
-	//pDbRequestTimer_ = new DBRequestTimer{ dbWriteReqInterval,hcp_,3,pDbThread_ };
-
-	//// 모니터링 서버 타임아웃(대부분의 경우 필요없을거같지만 원장님이 악의적인 공격시 혹시라도 OnConnectionRequest에서 못끊어낼까봐 만듬)
-	//pLanTimeOut_ = new LanServerTimeOut{ 1000 * 3,hcp_,3,this };
 
 	pNetServer_ = pNetServer;
 	pNetServer->Start();
@@ -270,6 +246,7 @@ BOOL MonitorLanServer::Start(MonitorNetServer* pNetServer)
 	Scheduler::Register_UPDATE(pConsoleMonitor_);
 	pDbThread_->RegisterTimeOut();
 	Scheduler::Start();
+	ResumeThread(hAcceptThread_);
 	return TRUE;
 }
 

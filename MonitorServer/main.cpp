@@ -37,7 +37,7 @@ int main()
 		GetValueUINT(psr,L"IOCP_ACTIVE_THREAD"),
 		GetValueINT(psr,L"IS_ZERO_BYTE_SEND"),
 		GetValueINT(psr,L"SESSION_MAX"),
-		TRUE,
+		FALSE,
 		1000,
 		3000,
 		GetValueUINT(psr,L"MONITOR_DATA_DB_WRITE_REQUEST_INTERVAL"),

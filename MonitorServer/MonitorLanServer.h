@@ -7,7 +7,6 @@ class MonitorLanServer : public Monitorable, public LanServer
 public:
 	MonitorLanServer(const WCHAR* pIP, const USHORT port, const DWORD IocpWorkerThreadNum, const DWORD CuncurrentThreadNum, const BOOL bZeroCopy,
 		const LONG maxSession, const BOOL bActivateTimeOut, const LONG userTimeOut, const DWORD timeOutCheckInterval, const DWORD DBWriteInterval, const  DWORD DBWriteTimeOut);
-	MonitorLanServer();
 	BOOL Start(MonitorNetServer* pNetServer);
 	virtual BOOL OnConnectionRequest(const WCHAR* pIP, const USHORT port) override;
 	virtual void* OnAccept(ULONGLONG id) override;

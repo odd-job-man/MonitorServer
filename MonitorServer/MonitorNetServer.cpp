@@ -15,12 +15,6 @@ MonitorNetServer::MonitorNetServer(const WCHAR* pIP, const USHORT port, const DW
 }
 
 
-MonitorNetServer::MonitorNetServer()
-    :NetServer{ L"MonitorNetConfig.txt" }
-{
-    InitializeSRWLock(&uMapLock);
-}
-
 BOOL MonitorNetServer::Start()
 {
     for (DWORD i = 0; i < IOCP_WORKER_THREAD_NUM_; ++i)
