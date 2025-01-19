@@ -38,9 +38,6 @@
     <ClCompile Include="..\..\ServerCommon\ServerCommon\NetWork\RingBuffer.cpp">
       <Filter>ServerCommon</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.cpp">
-      <Filter>ServerCommon</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.cpp">
       <Filter>ServerCommon</Filter>
     </ClCompile>
@@ -67,6 +64,12 @@
     </ClCompile>
     <ClCompile Include="MonitorDbThread.cpp">
       <Filter>MonitorServer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Scheduler.cpp">
+      <Filter>ServerCommon</Filter>
+    </ClCompile>
+    <ClCompile Include="LanServerTimeOut.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -115,12 +118,6 @@
     <ClInclude Include="..\..\ServerCommon\ServerCommon\NetWork\RingBuffer.h">
       <Filter>ServerCommon</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\ServerCommon\ServerCommon\Parser\Parser.h">
-      <Filter>ServerCommon</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.h">
-      <Filter>ServerCommon</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.h">
       <Filter>ServerCommon</Filter>
     </ClInclude>
@@ -135,9 +132,6 @@
     </ClInclude>
     <ClInclude Include="CommonProtocol.h">
       <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ServerInfo.h">
-      <Filter>MonitorServer</Filter>
     </ClInclude>
     <ClInclude Include="MonitorNetServer.h">
       <Filter>MonitorServer</Filter>
@@ -172,5 +166,24 @@
     <ClInclude Include="MonitorDbThread.h">
       <Filter>MonitorServer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Scheduler.h">
+      <Filter>ServerCommon</Filter>
+    </ClInclude>
+    <ClInclude Include="LanServerTimeOut.h">
+      <Filter>MonitorServer</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="TextParser.dll">
+      <Filter>소스 파일</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="TextParser.lib">
+      <Filter>소스 파일</Filter>
+    </Library>
   </ItemGroup>
 </Project>

@@ -140,8 +140,9 @@
     <ClCompile Include="..\..\ServerCommon\ServerCommon\DB\QueryFactory.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\Monitor\HMonitor.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\NetWork\RingBuffer.cpp" />
-    <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.cpp" />
+    <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Scheduler.cpp" />
     <ClCompile Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.cpp" />
+    <ClCompile Include="LanServerTimeOut.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MonitorDbThread.cpp" />
     <ClCompile Include="MonitorLanServer.cpp" />
@@ -169,19 +170,25 @@
     <ClInclude Include="..\..\ServerCommon\ServerCommon\MYOVERLAPPED.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\NetWork\Packet.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\NetWork\RingBuffer.h" />
-    <ClInclude Include="..\..\ServerCommon\ServerCommon\Parser\Parser.h" />
-    <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Timer.h" />
+    <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\Scheduler.h" />
     <ClInclude Include="..\..\ServerCommon\ServerCommon\UpdateAndTimer\UpdateBase.h" />
     <ClInclude Include="ChatData.h" />
     <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="EchoData.h" />
+    <ClInclude Include="LanServerTimeOut.h" />
     <ClInclude Include="LoginData.h" />
     <ClInclude Include="MonitorData.h" />
     <ClInclude Include="MonitorDbThread.h" />
     <ClInclude Include="MonitorLanServer.h" />
     <ClInclude Include="MonitorNetServer.h" />
+    <ClInclude Include="Parser.h" />
     <ClInclude Include="ServerCommonData.h" />
-    <ClInclude Include="ServerInfo.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="TextParser.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="TextParser.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include "CommonProtocol.h"
 #include "MonitorLanServer.h"
-#include "Timer.h"
+#include "Scheduler.h"
 #include "MyJob.h"
 #include "ChatData.h"
 #include "EchoData.h"
@@ -10,13 +10,27 @@
 #include "ServerCommonData.h"
 #include "QueryFactory.h"
 #include "MonitorDbThread.h"
+#include "LanServerTimeOut.h"
 #include <Parser.h>
+#include <WS2tcpip.h>
+
 ChatData g_chatData;
 LoginData g_loginData;
 EchoData g_echoData;
 ServerCommonData g_common;
 
+struct LanServerIDInfo
+{
+	ULONGLONG sessionID_;
+	SERVERNUM serverNum_;
+	LanServerIDInfo()
+		:sessionID_{ MAXULONGLONG }, serverNum_{ SERVERNUM::NUM }
+	{
+	}
+};
+
 LONG LoginArr[SERVERNUM::NUM];
+LanServerIDInfo LanSessioninfoArr[SERVERNUM::NUM];
 
 #define PROCESS_QUERY_IMPL(Server,elem,dataValue) do{\
 	EnterCriticalSection(&Server.cs);\
@@ -208,9 +222,8 @@ MonitorLanServer::MonitorLanServer()
 {
 }
 
-BOOL MonitorLanServer::Start()
+BOOL MonitorLanServer::Start(MonitorNetServer* pNetServer)
 {
-	pSIArr_ = new ServerInfo[maxSession_];
 	pConsoleMonitor_ = new MonitoringUpdate{ hcp_,1000,3 };
 	pConsoleMonitor_->RegisterMonitor(static_cast<const Monitorable*>(this));
 
@@ -229,27 +242,38 @@ BOOL MonitorLanServer::Start()
 	DWORD dbWriteTimeOut = (DWORD)_wtoi((LPCWSTR)pStart);
 	ReleaseParser(psr);
 
-
 	// DbTimeOut, Db쓰기스레드
 	pDbThread_ = new MonitorDbThread{ dbWriteTimeOut,hcp_,3 };
 
 	// 5분에 한번씩 DB스레드에 모니터링 데이터 Wrtie요청
 	pDbRequestTimer_ = new DBRequestTimer{ dbWriteReqInterval,hcp_,3,pDbThread_ };
-	pNetServer = new MonitorNetServer;
+
+	// 모니터링 서버 타임아웃(대부분의 경우 필요없을거같지만 원장님이 악의적인 공격시 혹시라도 OnConnectionRequest에서 못끊어낼까봐 만듬)
+	pLanTimeOut_ = new LanServerTimeOut{ 1000 * 3,hcp_,3,this };
+
+	pNetServer_ = pNetServer;
 	pNetServer->Start();
 
-	Timer::Reigster_UPDATE(pDbThread_);
-	Timer::Reigster_UPDATE(pDbRequestTimer_);
-	Timer::Reigster_UPDATE(pConsoleMonitor_);
+	Scheduler::Register_UPDATE(pDbThread_);
+	Scheduler::Register_UPDATE(pDbRequestTimer_);
+	Scheduler::Register_UPDATE(pConsoleMonitor_);
+	Scheduler::Register_UPDATE(pLanTimeOut_);
 	pDbThread_->RegisterTimeOut();
-	Timer::Start();
+	Scheduler::Start();
 	return TRUE;
 }
 
-BOOL MonitorLanServer::OnConnectionRequest(const SOCKADDR_IN* pSockAddrIn)
+BOOL MonitorLanServer::OnConnectionRequest(const WCHAR* pIP, const USHORT port)
 {
+	if (0 != memcmp(pIP, L"127.0.0.1", 16))
+	{
+		LOG(L"INVALID_CONNECT", SYSTEM, TEXTFILE, L"IP : %s PORT : %d", pIP, port);
+		return FALSE;
+	}
+
 	return TRUE;
 }
+
 
 void* MonitorLanServer::OnAccept(ULONGLONG id)
 {
@@ -258,9 +282,23 @@ void* MonitorLanServer::OnAccept(ULONGLONG id)
 
 void MonitorLanServer::OnRelease(ULONGLONG id)
 {
-	int idx = LanSession::GET_SESSION_INDEX(id);
-	ServerInfo* pSI = pSIArr_ + idx;
-	switch ((SERVERNUM)(pSI->num_))
+	SERVERNUM num = SERVERNUM::NUM;
+	for (int i = 0; i < SERVERNUM::NUM; ++i)
+	{
+		if (id == LanSessioninfoArr[i].sessionID_)
+		{
+			num = (SERVERNUM)i;
+			break;
+		}
+	}
+
+	if (num == SERVERNUM::NUM)
+	{
+		LOG(L"INVALID_CONNECT", SYSTEM, TEXTFILE, L"OnconnectionRequest is did not fullfill his role, ip : %s, port : %d", GetSessionIP(id), GetSessionPort(id));
+		return;
+	}
+
+	switch (num)
 	{
 	case CHAT:
 	{
@@ -293,7 +331,8 @@ void MonitorLanServer::OnRelease(ULONGLONG id)
 		__debugbreak();
 		break;
 	}
-	InterlockedDecrement(LoginArr + pSI->num_);
+
+	InterlockedDecrement(LoginArr + num);
 	if (InterlockedDecrement(&loginServerNum_) == 0)
 	{
 		EnterCriticalSection(&g_common.cs);
@@ -305,83 +344,106 @@ void MonitorLanServer::OnRelease(ULONGLONG id)
 
 void MonitorLanServer::OnRecv(ULONGLONG id, Packet* pPacket)
 {
-	WORD type;
-	(*pPacket) >> type;
-	switch ((en_PACKET_TYPE)type)
+	// 랜서버여서 그냥 믿으려고 햇으나 누군가의 악의적인 공격으로 추가함.
+	try
 	{
-	case en_PACKET_SS_MONITOR_LOGIN:
-	{
-		int serverNo;
-		(*pPacket) >> serverNo;
+		WORD type;
+		BYTE serverNo;
+		(*pPacket) >> type >> serverNo;
 		if (serverNo >= SERVERNUM::NUM)
 		{
-			LOG(L"ERROR", SYSTEM, CONSOLE, L"SERVERNUM %d, Invalid Server Login", serverNo);
-			LOG(L"ERROR", SYSTEM, TEXTFILE, L"SERVERNUM %d, Invalid Server Login", serverNo);
+			LOG(L"ERROR", SYSTEM, CONSOLE, L"SERVERNUM %d, Invalid Server OnRecv", serverNo);
+			LOG(L"ERROR", SYSTEM, TEXTFILE, L"SERVERNUM %d, Invalid Server OnRecv", serverNo);
 			Disconnect(id);
-			break;
+			return;
 		}
 
-		if (InterlockedIncrement(LoginArr + serverNo) > 1)
+		switch ((en_PACKET_TYPE)type)
 		{
-			InterlockedDecrement(LoginArr + serverNo);
-			LOG(L"ERROR", SYSTEM, CONSOLE, L"SERVERNUM %d, Duplicated Login", serverNo);
-			LOG(L"ERROR", SYSTEM, TEXTFILE, L"SERVERNUM %d, Duplicated Login", serverNo);
-			Disconnect(id);
-			break;
-		}
+		case en_PACKET_SS_MONITOR_LOGIN:
+		{
+			if (InterlockedIncrement(LoginArr + serverNo) > 1) // Release 되기 직전에 누가 새로들어오면 끊기겟지만 그정도로 정밀성은 필요없다
+			{
+				InterlockedDecrement(LoginArr + serverNo);
+				LOG(L"ERROR", SYSTEM, CONSOLE, L"SERVERNUM %d, Duplicated Login", serverNo);
+				LOG(L"ERROR", SYSTEM, TEXTFILE, L"SERVERNUM %d, Duplicated Login", serverNo);
+				Disconnect(id);
+				break;
+			}
 
-		int idx = LanSession::GET_SESSION_INDEX(id);
-		ServerInfo* pSI = pSIArr_ + idx;
-		pSI->num_ = (SERVERNUM)serverNo;
-		InterlockedIncrement(&loginServerNum_);
-		switch ((SERVERNUM)serverNo)
-		{
-		case CHAT:
-		{
-			EnterCriticalSection(&g_chatData.cs);
-			g_chatData.onoff_ = true;
-			LeaveCriticalSection(&g_chatData.cs);
+			InterlockedIncrement(&loginServerNum_);
+			switch ((SERVERNUM)serverNo)
+			{
+			case CHAT:
+			{
+				EnterCriticalSection(&g_chatData.cs);
+				g_chatData.onoff_ = true;
+				LeaveCriticalSection(&g_chatData.cs);
+				break;
+			}
+			case LOGIN:
+			{
+				EnterCriticalSection(&g_loginData.cs);
+				g_loginData.onoff_ = true;
+				LeaveCriticalSection(&g_loginData.cs);
+				break;
+			}
+			case GAME:
+			{
+				EnterCriticalSection(&g_echoData.cs);
+				g_echoData.onoff_ = true;
+				LeaveCriticalSection(&g_echoData.cs);
+				break;
+			}
+			default:
+				// 위에서 걸러졋어야햇는데 안걸러진게 말이안됨
+				__debugbreak();
+				break;
+			}
+
+			LanSessioninfoArr[serverNo].sessionID_ = id;
+			LanSessioninfoArr[serverNo].serverNum_ = (SERVERNUM)serverNo;
+
+			SmartPacket sp = PACKET_ALLOC(Lan);
+			(*sp) << (WORD)1;
+			SendPacket(id, sp);
+			ServerOnDBWriteReq((SERVERNUM)serverNo, this);
 			break;
 		}
-		case LOGIN:
+		case en_PACKET_SS_MONITOR_DATA_UPDATE:
 		{
-			EnterCriticalSection(&g_loginData.cs);
-			g_loginData.onoff_ = true;
-			LeaveCriticalSection(&g_loginData.cs);
-			break;
-		}
-		case GAME:
-		{
-			EnterCriticalSection(&g_echoData.cs);
-			g_echoData.onoff_ = true;
-			LeaveCriticalSection(&g_echoData.cs);
+			BYTE dataType;
+			int dataValue;
+			int timeStamp;
+			(*pPacket) >> dataType >> dataValue >> timeStamp;
+
+			// 로그인시에 서버번호에 맞게 세션아이디가 초기화되엇을것이므로 누군가 로그인하지않고 보내야만 여기걸림
+			if (LanSessioninfoArr[serverNo].sessionID_ != id)
+			{
+				Disconnect(id);
+				break;
+			}
+
+			pNetServer_->SendToAllClient(serverNo, dataType, dataValue, timeStamp);
+			ProcessQueryData(dataType, dataValue, timeStamp);
 			break;
 		}
 		default:
-			__debugbreak();
 			break;
 		}
-		SmartPacket sp = PACKET_ALLOC(Lan);
-		(*sp) << (WORD)1;
-		SendPacket(id, sp);
-		ServerOnDBWriteReq((SERVERNUM)serverNo, this);
-		break;
 	}
-	case en_PACKET_SS_MONITOR_DATA_UPDATE:
+	catch (int errCode)
 	{
-		BYTE serverNo;
-		BYTE dataType;
-		int dataValue;
-		int timeStamp;
-		(*pPacket) >> serverNo >> dataType >> dataValue >> timeStamp;
-		int idx = LanSession::GET_SESSION_INDEX(id);
-		ServerInfo* pSI = pSIArr_ + idx;
-		pNetServer->SendToAllClient(pSI->num_, dataType, dataValue, timeStamp);
-		ProcessQueryData(dataType, dataValue, timeStamp);
-		break;
-	}
-	default:
-		break;
+		if (errCode == ERR_PACKET_EXTRACT_FAIL)
+		{
+			Disconnect(id);
+		}
+		else if (errCode == ERR_PACKET_RESIZE_FAIL)
+		{
+			// 리사이즈가 일어날 일이없음
+			LOG(L"RESIZE", ERR, TEXTFILE, L"Resize Fail ShutDown Server");
+			__debugbreak();
+		}
 	}
 
 	PACKET_FREE(pPacket);
@@ -397,8 +459,8 @@ void MonitorLanServer::OnPost(void* order)
 
 void MonitorLanServer::OnLastTaskBeforeAllWorkerThreadEndBeforeShutDown()
 {
-	pNetServer->ShutDown();
-	PostQueuedCompletionStatus(hcp_, 5, (ULONG_PTR)static_cast<UpdateBase*>(pDbRequestTimer_), (LPOVERLAPPED)Timer::GetUpdateOverlapped());
+	pNetServer_->ShutDown();
+	PostQueuedCompletionStatus(hcp_, 5, (ULONG_PTR)static_cast<UpdateBase*>(pDbRequestTimer_), (LPOVERLAPPED)Scheduler::GetUpdateOverlapped());
 }
 
 void MonitorLanServer::OnResourceCleanAtShutDown()
@@ -406,7 +468,7 @@ void MonitorLanServer::OnResourceCleanAtShutDown()
 	delete pConsoleMonitor_;
 	delete pDbRequestTimer_;
 	delete pDbThread_;
-	delete pNetServer;
+	delete pNetServer_;
 }
 
 void MonitorLanServer::OnMonitor()
@@ -437,7 +499,7 @@ void MonitorLanServer::OnMonitor()
 	ullElapsedHour %= 24;
 
 	LONG64 recvTPS = InterlockedExchange64(&recvTPS_, 0);
-	LONG sendTPS = InterlockedExchange(&pNetServer->sendTPS_, 0);
+	LONG sendTPS = InterlockedExchange(&pNetServer_->sendTPS_, 0);
 	
 	static int shutDownFlag = 10;
 	static int sdfCleanFlag = 0; // 1분넘어가면 초기화
@@ -456,8 +518,8 @@ void MonitorLanServer::OnMonitor()
 		shutDownFlag,
 		lSessionNum_,
 		loginServerNum_,
-		pNetServer->lSessionNum_,
-		pNetServer->monitorClientNum_,
+		pNetServer_->lSessionNum_,
+		pNetServer_->monitorClientNum_,
 		recvTPS,
 		sendTPS,
 		pDbThread_->jobQ_.GetSize()

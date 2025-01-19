@@ -5,6 +5,8 @@
 class MonitorNetServer : public NetServer
 {
 public:
+	MonitorNetServer(const WCHAR* pIP, const USHORT port, const DWORD IocpWorkerThreadNum, const DWORD CuncurrentThreadNum,
+		const BOOL bZeroCopy, const LONG maxSession, const LONG maxUser, const BYTE packetCode, const BYTE packetFixedKey, const BOOL bActivateTimeOut, const LONG userTimeOut, const DWORD timeOutCheckInterval);
 	MonitorNetServer();
 	BOOL Start();
 	virtual BOOL OnConnectionRequest(const SOCKADDR_IN* pSockAddrIn) override;

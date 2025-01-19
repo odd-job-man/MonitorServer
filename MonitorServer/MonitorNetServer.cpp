@@ -8,6 +8,13 @@
 #include <unordered_set>
 
 
+MonitorNetServer::MonitorNetServer(const WCHAR* pIP, const USHORT port, const DWORD IocpWorkerThreadNum, const DWORD CuncurrentThreadNum, const BOOL bZeroCopy, const LONG maxSession,const LONG maxUser, const BYTE packetCode, const BYTE packetFixedKey, const BOOL bActivateTimeOut, const LONG userTimeOut, const DWORD timeOutCheckInterval)
+    :NetServer{ pIP,port,IocpWorkerThreadNum,CuncurrentThreadNum,bZeroCopy,maxSession,packetCode,packetFixedKey,bActivateTimeOut,userTimeOut,timeOutCheckInterval }
+{
+    InitializeSRWLock(&uMapLock);
+}
+
+
 MonitorNetServer::MonitorNetServer()
     :NetServer{ L"MonitorNetConfig.txt" }
 {
@@ -37,35 +44,56 @@ void MonitorNetServer::OnRelease(ULONGLONG id)
 {
     PostQueuedCompletionStatus(hcp_, 4, (ULONG_PTR)id, (LPOVERLAPPED)&OnPostOverlapped);
 }
+
 void MonitorNetServer::OnRecv(ULONGLONG id, Packet* pPacket)
-
 {
-    WORD type;
-    (*pPacket) >> type;
-    switch ((en_PACKET_TYPE)type)
-    {
-    case en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN:
-    {
-        pPacket->MoveReadPos(32);
-        NetSession* pSession = pSessionArr_ + NetSession::GET_SESSION_INDEX(id);
+    try
+    { 
+		WORD type;
+		(*pPacket) >> type;
+		switch ((en_PACKET_TYPE)type)
+		{
+		case en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN:
+		{
+            if (!pPacket->GetPointer(32))
+            {
+                Disconnect(id);
+                break;
+            }
+			NetSession* pSession = pSessionArr_ + NetSession::GET_SESSION_INDEX(id);
 
-        // 모니터링 클라 자료구조에 추가
-        AcquireSRWLockExclusive(&uMapLock);
-        uMap.insert(id);
-        InterlockedIncrement(&monitorClientNum_);
-        ReleaseSRWLockExclusive(&uMapLock);
+			// 모니터링 클라 자료구조에 추가
+			AcquireSRWLockExclusive(&uMapLock);
+			uMap.insert(id);
+			InterlockedIncrement(&monitorClientNum_);
+			ReleaseSRWLockExclusive(&uMapLock);
 
-        // 그사이에 Release되엇으면 SendPacket이 실패함
-        SmartPacket pSendPacket = PACKET_ALLOC(Net);
-        (*pSendPacket) << (WORD)en_PACKET_CS_MONITOR_TOOL_RES_LOGIN << (BYTE)dfMONITOR_TOOL_LOGIN_OK;
-        SendPacket(id, pSendPacket);
-        break;
+			// 그사이에 Release되엇으면 SendPacket이 실패함
+			SmartPacket pSendPacket = PACKET_ALLOC(Net);
+			(*pSendPacket) << (WORD)en_PACKET_CS_MONITOR_TOOL_RES_LOGIN << (BYTE)dfMONITOR_TOOL_LOGIN_OK;
+			SendPacket(id, pSendPacket);
+			break;
+		}
+		default:
+            LOG(L"OnRecvErr", SYSTEM, TEXTFILE, L"");
+            Disconnect(id);
+			break;
+		}
     }
-    default:
-        __debugbreak();
-        break;
+    catch (int errCode)
+    {
+        if (errCode == ERR_PACKET_EXTRACT_FAIL)
+        {
+            Disconnect(id);
+        }
+        else if (errCode == ERR_PACKET_RESIZE_FAIL)
+        {
+            // 해당 서버는 리사이즈가 일어날 일이없음
+            LOG(L"RESIZE", ERR, TEXTFILE, L"Resize Fail ShutDown Server");
+            __debugbreak();
+        }
     }
-
+  
     PACKET_FREE(pPacket);
 }
 
@@ -101,7 +129,7 @@ void MonitorNetServer::SendToAllClient(BYTE serverNo, BYTE dataType, int dataVal
 void MonitorNetServer::OnRelease_IMPL(ULONGLONG id)
 {
     AcquireSRWLockExclusive(&uMapLock);
-    ASSERT_LOG(uMap.erase(id) != 1,L"NoExist Session Release");
+    uMap.erase(id);
     InterlockedDecrement(&monitorClientNum_);
     ReleaseSRWLockExclusive(&uMapLock);
 }
