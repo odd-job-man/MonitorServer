@@ -6,7 +6,7 @@
 #include "Parser.h"
 
 
-MonitorLanServer g_MLS;
+//MonitorLanServer g_MLS;
 
 int main()
 {
@@ -27,7 +27,28 @@ int main()
 	};
 	ReleaseParser(psr);
 
-	g_MLS.Start(pMonitorNetServer);
-	g_MLS.WaitUntilShutDown();
+	psr = CreateParser(L"MonitorLanConfig.txt");
+	len = GetValueWSTR(psr, ipStr, _countof(ipStr), L"BIND_IP");
+	auto* pMonitorLanServer = new MonitorLanServer
+	{
+		ipStr,
+		(const USHORT)GetValueINT(psr,L"BIND_PORT"),
+		GetValueUINT(psr,L"IOCP_WORKER_THREAD"),
+		GetValueUINT(psr,L"IOCP_ACTIVE_THREAD"),
+		GetValueINT(psr,L"IS_ZERO_BYTE_SEND"),
+		GetValueINT(psr,L"SESSION_MAX"),
+		TRUE,
+		1000,
+		3000,
+		GetValueUINT(psr,L"MONITOR_DATA_DB_WRITE_REQUEST_INTERVAL"),
+		GetValueUINT(psr,L"DB_WRITE_TIMEOUT")
+	};
+	ReleaseParser(psr);
+
+	pMonitorLanServer->Start(pMonitorNetServer);
+	pMonitorLanServer->WaitUntilShutDown();
+
+	//g_MLS.Start(pMonitorNetServer);
+	//g_MLS.WaitUntilShutDown();
 	return 0;
 }
